@@ -11,12 +11,28 @@ const Index = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState({});
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
   const messagesEndRef = useRef(null);
+  
+  // Система пользователей и никнеймов
+  const [userProfile, setUserProfile] = useState({
+    id: 'me',
+    name: 'Юрий Космонавт',
+    nickname: '@space_explorer',
+    avatar: '👨‍🚀',
+    bio: 'Исследователь космоса и разработчик'
+  });
+  
+  const [nicknameInput, setNicknameInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [bioInput, setBioInput] = useState('');
   
   const [chatData, setChatData] = useState({
     1: {
       id: 1,
       name: 'Алекс',
+      nickname: '@alex_dev',
       avatar: '👨‍💻',
       online: true,
       lastSeen: 'в сети',
@@ -29,6 +45,7 @@ const Index = () => {
     2: {
       id: 2,
       name: 'Мария',
+      nickname: '@artist_maria',
       avatar: '👩‍🎨',
       online: true,
       lastSeen: 'в сети',
@@ -40,6 +57,7 @@ const Index = () => {
     3: {
       id: 3,
       name: 'Бот SecretBot',
+      nickname: '@secret_bot',
       avatar: '🤖',
       online: false,
       lastSeen: 'был в сети час назад',
@@ -57,9 +75,9 @@ const Index = () => {
   ]);
 
   const [contacts] = useState([
-    { id: 1, name: 'Алекс Иванов', phone: '+7 999 123-45-67', avatar: '👨‍💻', online: true },
-    { id: 2, name: 'Мария Петрова', phone: '+7 999 765-43-21', avatar: '👩‍🎨', online: true },
-    { id: 3, name: 'Анна Сидорова', phone: '+7 999 555-12-34', avatar: '👩‍💼', online: false },
+    { id: 1, name: 'Алекс Иванов', nickname: '@alex_dev', phone: '+7 999 123-45-67', avatar: '👨‍💻', online: true },
+    { id: 2, name: 'Мария Петрова', nickname: '@artist_maria', phone: '+7 999 765-43-21', avatar: '👩‍🎨', online: true },
+    { id: 3, name: 'Анна Сидорова', nickname: '@anna_work', phone: '+7 999 555-12-34', avatar: '👩‍💼', online: false },
   ]);
 
   const [groups] = useState([
@@ -104,6 +122,62 @@ const Index = () => {
       'Секретный код принят. Активирую функции...⚡',
       'Система обновлена. Добро пожаловать, админ!',
     ]
+  };
+
+  // Валидация никнейма
+  const validateNickname = (nickname) => {
+    if (!nickname.startsWith('@')) return 'Никнейм должен начинаться с @';
+    if (nickname.length < 4) return 'Никнейм должен содержать минимум 3 символа после @';
+    if (nickname.length > 20) return 'Никнейм не может быть длиннее 19 символов';
+    if (!/^@[a-zA-Z0-9_]+$/.test(nickname)) return 'Никнейм может содержать только буквы, цифры и _';
+    return null;
+  };
+
+  // Сохранение профиля
+  const handleSaveProfile = () => {
+    const nicknameError = validateNickname(nicknameInput);
+    if (nicknameError) {
+      alert(nicknameError);
+      return;
+    }
+    
+    if (!nameInput.trim()) {
+      alert('Имя не может быть пустым');
+      return;
+    }
+
+    setUserProfile({
+      ...userProfile,
+      name: nameInput.trim(),
+      nickname: nicknameInput.trim(),
+      bio: bioInput.trim()
+    });
+    
+    setEditingProfile(false);
+    setEditingNickname(false);
+  };
+
+  // Начало редактирования профиля
+  const startEditingProfile = () => {
+    setNameInput(userProfile.name);
+    setNicknameInput(userProfile.nickname);
+    setBioInput(userProfile.bio);
+    setEditingProfile(true);
+  };
+
+  // Начало редактирования никнейма
+  const startEditingNickname = () => {
+    setNicknameInput(userProfile.nickname);
+    setEditingNickname(true);
+  };
+
+  // Отмена редактирования
+  const cancelEditing = () => {
+    setEditingProfile(false);
+    setEditingNickname(false);
+    setNameInput('');
+    setNicknameInput('');
+    setBioInput('');
   };
 
   const handleSendMessage = (e) => {
@@ -161,10 +235,12 @@ const Index = () => {
       // Особая логика для бота
       if (selectedChat === 3) {
         if (messageText.includes('ADMIN_SPACE_ROCKET_MISSION')) {
-          response = 'Секретный код принят! 🔓 Вам предоставлены права администратора. Добро пожаловать!';
+          response = `Секретный код принят! 🔓 Добро пожаловать, ${userProfile.nickname}! Вам предоставлены права администратора.`;
           setAdminMode(true);
+        } else if (messageText.startsWith('/nickname')) {
+          response = `Ваш текущий никнейм: ${userProfile.nickname}. Для смены перейдите в профиль.`;
         } else if (messageText.startsWith('/')) {
-          response = 'Доступные команды: /help, /status, /admin. Для админ-функций введите секретный код.';
+          response = 'Доступные команды: /help, /status, /nickname, /admin. Для админ-функций введите секретный код.';
         } else {
           response = responses[Math.floor(Math.random() * responses.length)];
         }
@@ -235,7 +311,10 @@ const Index = () => {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start">
-                <h3 className="font-semibold text-gray-900 truncate">{chat.name}</h3>
+                <div>
+                  <h3 className="font-semibold text-gray-900 truncate">{chat.name}</h3>
+                  <p className="text-xs text-telegram-blue">{chat.nickname}</p>
+                </div>
                 <span className="text-sm text-gray-500">{chat.messages[chat.messages.length - 1]?.time}</span>
               </div>
               <p className="text-gray-600 truncate">{chat.messages[chat.messages.length - 1]?.text}</p>
@@ -267,6 +346,7 @@ const Index = () => {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900">{chat.name}</h3>
+              <p className="text-xs text-telegram-blue">{chat.nickname}</p>
               <p className="text-sm text-gray-500">{isTyping[selectedChat] ? 'печатает...' : chat.lastSeen}</p>
             </div>
             <Button variant="ghost" size="sm">
@@ -385,6 +465,7 @@ const Index = () => {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900">{contact.name}</h3>
+              <p className="text-xs text-telegram-blue">{contact.nickname}</p>
               <p className="text-gray-600">{contact.phone}</p>
             </div>
             <Button variant="outline" size="sm" onClick={() => openChat(contact.id)}>
@@ -421,12 +502,78 @@ const Index = () => {
     <Card className="p-6">
       <div className="text-center space-y-4">
         <Avatar className="w-24 h-24 mx-auto">
-          <AvatarFallback className="text-3xl bg-telegram-blue text-white">👨‍🚀</AvatarFallback>
+          <AvatarFallback className="text-3xl bg-telegram-blue text-white">{userProfile.avatar}</AvatarFallback>
         </Avatar>
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Юрий Космонавт</h2>
-          <p className="text-gray-600">@space_explorer</p>
-        </div>
+        
+        {editingProfile ? (
+          <div className="space-y-3">
+            <Input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Ваше имя"
+              className="text-center"
+            />
+            <Input
+              value={nicknameInput}
+              onChange={(e) => setNicknameInput(e.target.value)}
+              placeholder="@nickname"
+              className="text-center"
+            />
+            <textarea
+              value={bioInput}
+              onChange={(e) => setBioInput(e.target.value)}
+              placeholder="О себе..."
+              className="w-full p-2 border rounded-md text-center resize-none"
+              rows={2}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveProfile} className="flex-1">
+                <Icon name="Check" size={16} className="mr-2" />
+                Сохранить
+              </Button>
+              <Button variant="outline" onClick={cancelEditing} className="flex-1">
+                <Icon name="X" size={16} className="mr-2" />
+                Отмена
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div onClick={startEditingProfile} className="cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors">
+              <h2 className="text-xl font-bold text-gray-900">{userProfile.name}</h2>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-telegram-blue font-medium">{userProfile.nickname}</p>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); startEditingNickname(); }}>
+                  <Icon name="Edit" size={14} />
+                </Button>
+              </div>
+              <p className="text-gray-600 text-sm mt-1">{userProfile.bio}</p>
+              <p className="text-xs text-gray-400 mt-2">Нажмите для редактирования</p>
+            </div>
+            
+            {editingNickname && (
+              <div className="space-y-2 p-3 bg-blue-50 rounded-md">
+                <Input
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  placeholder="@nickname"
+                  className="text-center"
+                />
+                <div className="flex space-x-2">
+                  <Button onClick={handleSaveProfile} size="sm" className="flex-1">
+                    <Icon name="Check" size={14} className="mr-1" />
+                    ОК
+                  </Button>
+                  <Button variant="outline" onClick={cancelEditing} size="sm" className="flex-1">
+                    <Icon name="X" size={14} className="mr-1" />
+                    Отмена
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
         <div className="space-y-2">
           <Button variant="outline" className="w-full">
             <Icon name="Settings" size={16} className="mr-2" />
