@@ -13,6 +13,11 @@ const Index = () => {
   const [isTyping, setIsTyping] = useState({});
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
+  const [gameQuestion, setGameQuestion] = useState(null);
+  const [gameScore, setGameScore] = useState(0);
   const messagesEndRef = useRef(null);
   
   // Система пользователей и никнеймов
@@ -27,6 +32,24 @@ const Index = () => {
   const [nicknameInput, setNicknameInput] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
+  
+  // База данных всех пользователей
+  const allUsers = [
+    { id: 'me', name: userProfile.name, nickname: userProfile.nickname, avatar: userProfile.avatar },
+    { id: 1, name: 'Алекс', nickname: '@alex_dev', avatar: '👨‍💻' },
+    { id: 2, name: 'Мария', nickname: '@artist_maria', avatar: '👩‍🎨' },
+    { id: 3, name: 'Бот SecretBot', nickname: '@secret_bot', avatar: '🤖' },
+    { id: 4, name: 'Анна Сидорова', nickname: '@anna_work', avatar: '👩‍💼' },
+  ];
+  
+  // Мини-игра "Космические загадки"
+  const gameQuestions = [
+    { question: 'Какая планета самая большая в Солнечной системе?', answers: ['Юпитер', 'Сатурн', 'Уран', 'Нептун'], correct: 0 },
+    { question: 'Количество лун у Юпитера?', answers: ['79', '82', '95', '67'], correct: 1 },
+    { question: 'Как называется ближайшая к Земле звезда?', answers: ['Проксима Центавра', 'Альфа Центавра', 'Сириус', 'Вега'], correct: 0 },
+    { question: 'Какое расстояние от Земли до Луны?', answers: ['384 400 км', '238 855 миль', '150 млн км', '1 а.е.'], correct: 0 },
+    { question: 'Как называется первая космическая станция?', answers: ['Мир', 'Салют-1', 'ИСС', 'Скайлэб'], correct: 1 }
+  ];
   
   const [chatData, setChatData] = useState({
     1: {
@@ -126,30 +149,39 @@ const Index = () => {
 
   // Валидация никнейма
   const validateNickname = (nickname) => {
+    if (!nickname || nickname.trim() === '') return 'Никнейм не может быть пустым';
     if (!nickname.startsWith('@')) return 'Никнейм должен начинаться с @';
     if (nickname.length < 4) return 'Никнейм должен содержать минимум 3 символа после @';
     if (nickname.length > 20) return 'Никнейм не может быть длиннее 19 символов';
     if (!/^@[a-zA-Z0-9_]+$/.test(nickname)) return 'Никнейм может содержать только буквы, цифры и _';
+    
+    // Проверка уникальности
+    const existingUser = allUsers.find(user => user.nickname === nickname && user.id !== userProfile.id);
+    if (existingUser) return 'Этот никнейм уже занят!';
+    
     return null;
   };
 
   // Сохранение профиля
   const handleSaveProfile = () => {
-    const nicknameError = validateNickname(nicknameInput);
-    if (nicknameError) {
-      alert(nicknameError);
+    const trimmedNickname = nicknameInput.trim();
+    const trimmedName = nameInput.trim();
+    
+    if (!trimmedName) {
+      alert('Имя не может быть пустым');
       return;
     }
     
-    if (!nameInput.trim()) {
-      alert('Имя не может быть пустым');
+    const nicknameError = validateNickname(trimmedNickname);
+    if (nicknameError) {
+      alert(nicknameError);
       return;
     }
 
     setUserProfile({
       ...userProfile,
-      name: nameInput.trim(),
-      nickname: nicknameInput.trim(),
+      name: trimmedName,
+      nickname: trimmedNickname,
       bio: bioInput.trim()
     });
     
@@ -178,6 +210,71 @@ const Index = () => {
     setNameInput('');
     setNicknameInput('');
     setBioInput('');
+  };
+
+  // Поиск пользователей
+  const searchUsers = (query) => {
+    if (!query.trim()) return [];
+    return allUsers.filter(user => 
+      user.nickname.toLowerCase().includes(query.toLowerCase()) ||
+      user.name.toLowerCase().includes(query.toLowerCase())
+    );
+  };
+
+  // Обработка @mentions в сообщениях
+  const processMessageWithMentions = (text) => {
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+    return text.replace(mentionRegex, (match, username) => {
+      const user = allUsers.find(u => u.nickname === `@${username}`);
+      return user ? `<span style="color: #5BA2E5; font-weight: 600;">${match}</span>` : match;
+    });
+  };
+
+  // Мини-игра
+  const startGame = () => {
+    const randomQuestion = gameQuestions[Math.floor(Math.random() * gameQuestions.length)];
+    setGameQuestion(randomQuestion);
+    setGameActive(true);
+  };
+
+  const handleGameAnswer = (answerIndex) => {
+    if (answerIndex === gameQuestion.correct) {
+      setGameScore(gameScore + 1);
+      const newMessage = {
+        id: Date.now(),
+        text: `🎉 Правильно! Очки: ${gameScore + 1}`,
+        time: new Date().toLocaleTimeString().slice(0, 5),
+        sender: 'system',
+        delivered: true
+      };
+      
+      setChatData(prev => ({
+        ...prev,
+        3: {
+          ...prev[3],
+          messages: [...prev[3].messages, newMessage]
+        }
+      }));
+    } else {
+      const newMessage = {
+        id: Date.now(),
+        text: `❌ Неправильно! Правильный ответ: ${gameQuestion.answers[gameQuestion.correct]}`,
+        time: new Date().toLocaleTimeString().slice(0, 5),
+        sender: 'system',
+        delivered: true
+      };
+      
+      setChatData(prev => ({
+        ...prev,
+        3: {
+          ...prev[3],
+          messages: [...prev[3].messages, newMessage]
+        }
+      }));
+    }
+    
+    setGameActive(false);
+    setGameQuestion(null);
   };
 
   const handleSendMessage = (e) => {
@@ -237,15 +334,33 @@ const Index = () => {
         if (messageText.includes('ADMIN_SPACE_ROCKET_MISSION')) {
           response = `Секретный код принят! 🔓 Добро пожаловать, ${userProfile.nickname}! Вам предоставлены права администратора.`;
           setAdminMode(true);
+        } else if (messageText.startsWith('/game')) {
+          startGame();
+          response = '🎮 Начинаем космическую викторину! Отвечайте на вопросы:';
+        } else if (messageText.startsWith('/search')) {
+          const query = messageText.replace('/search', '').trim();
+          const results = searchUsers(query);
+          if (results.length > 0) {
+            response = `🔍 Найдено: ${results.map(u => `${u.name} (${u.nickname})`).join(', ')}`;
+          } else {
+            response = '🔍 Пользователи не найдены';
+          }
         } else if (messageText.startsWith('/nickname')) {
           response = `Ваш текущий никнейм: ${userProfile.nickname}. Для смены перейдите в профиль.`;
+        } else if (messageText.startsWith('/score')) {
+          response = `🏆 Ваш счет в викторине: ${gameScore} очков`;
         } else if (messageText.startsWith('/')) {
-          response = 'Доступные команды: /help, /status, /nickname, /admin. Для админ-функций введите секретный код.';
+          response = 'Доступные команды: /help, /game, /search <запрос>, /nickname, /score, /admin';
         } else {
           response = responses[Math.floor(Math.random() * responses.length)];
         }
       } else {
-        response = responses[Math.floor(Math.random() * responses.length)];
+        // Обработка @mentions для обычных чатов
+        if (messageText.includes(`@${userProfile.nickname.substring(1)}`)) {
+          response = `😊 Спасибо за упоминание, ${userProfile.nickname}!`;
+        } else {
+          response = responses[Math.floor(Math.random() * responses.length)];
+        }
       }
 
       setChatData(prev => ({
@@ -369,7 +484,10 @@ const Index = () => {
                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
                   : 'bg-gray-100 text-gray-900'
               }`}>
-                <p className="text-sm whitespace-pre-line">{message.text}</p>
+                <div 
+                  className="text-sm whitespace-pre-line" 
+                  dangerouslySetInnerHTML={{ __html: processMessageWithMentions(message.text) }}
+                />
                 <div className={`flex items-center justify-end space-x-1 mt-1 ${
                   message.sender === 'me' ? 'text-blue-100' : 'text-gray-500'
                 }`}>
@@ -385,6 +503,26 @@ const Index = () => {
               </div>
             </div>
           ))}
+          
+          {/* Game Question */}
+          {gameActive && gameQuestion && selectedChat === 3 && (
+            <Card className="p-4 bg-blue-50 border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-3">🎮 {gameQuestion.question}</h3>
+              <div className="grid grid-cols-1 gap-2">
+                {gameQuestion.answers.map((answer, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleGameAnswer(index)}
+                    className="justify-start"
+                  >
+                    {String.fromCharCode(65 + index)}. {answer}
+                  </Button>
+                ))}
+              </div>
+            </Card>
+          )}
           
           {/* Typing indicator */}
           {isTyping[selectedChat] && (
@@ -623,7 +761,7 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-gray-900">SpaceChat</h1>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={() => setShowSearch(!showSearch)}>
                 <Icon name="Search" size={20} />
               </Button>
               <Button variant="ghost" size="sm">
@@ -633,6 +771,44 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* Search Bar */}
+      {showSearch && (
+        <div className="bg-white border-b shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 py-3">
+            <div className="relative">
+              <Icon name="Search" size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по имени или @никнейму..."
+                className="pl-10"
+              />
+            </div>
+            {searchQuery && (
+              <div className="mt-3 space-y-2">
+                {searchUsers(searchQuery).map((user) => (
+                  <Card key={user.id} className="p-3 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { if (user.id !== 'me') openChat(user.id); }}>
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="text-sm">{user.avatar}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h4 className="font-medium text-gray-900">{user.name}</h4>
+                        <p className="text-sm text-telegram-blue">{user.nickname}</p>
+                      </div>
+                      {user.id === 'me' && <Badge variant="secondary" className="ml-auto">Вы</Badge>}
+                    </div>
+                  </Card>
+                ))}
+                {searchUsers(searchQuery).length === 0 && (
+                  <p className="text-center text-gray-500 py-4">Пользователи не найдены</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Navigation Tabs */}
@@ -672,6 +848,16 @@ const Index = () => {
           {activeTab === 'groups' && renderGroups()}
           {activeTab === 'profile' && renderProfile()}
         </div>
+        
+        {/* Game Score Display */}
+        {gameScore > 0 && (
+          <Card className="mt-4 p-4 bg-green-50 border-green-200">
+            <div className="flex items-center justify-center space-x-2">
+              <Icon name="Trophy" size={20} className="text-green-600" />
+              <span className="font-semibold text-green-800">Викторина: {gameScore} очков</span>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Floating Action Button */}
